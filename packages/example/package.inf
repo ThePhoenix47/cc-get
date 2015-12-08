@@ -1,0 +1,7 @@
+{
+  "Example Pkg",
+  "An example package",
+  "data/data.dat",
+  "lib/lib.lua",
+  "ex",
+}

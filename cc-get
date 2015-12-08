@@ -1,0 +1,20 @@
+args = {...}
+
+if args[1] == "install" then
+	print("NYI")
+elseif args[1] == "remove" then
+	print("NYI")
+elseif args[1] == "upgrade" then
+	print("NYI")
+elseif args[1] == "installed" then
+	print("Installed packages:")
+elseif args[1] == "help" then
+	print("Help for CC-GET")
+	print("======================")
+	print("install 'package' - installs 'package'")
+	print("remove 'package' - removes 'package'")
+	print("upgrade - upgrades all packages to the newest version")
+	print("          This CC-GET has super cow powers!")
+else
+	print("***Unknown Command!")
+end
