@@ -15,7 +15,7 @@ function loadPkg(name)
 	pkgRoot = source .. name .. "/"
 	pkg = textutils.unserialize(http.get(pkgRoot .. "package.inf").readAll())
 	for i, value in pairs(pkg) do
-		if i > 2 then
+		if i > 3 then
 			f = fs.open("/bin/cc-get/packages/" .. name .. "/" .. value, "w")
 			f.write(http.get(pkgRoot .. value).readAll())
 			f.close()
@@ -29,7 +29,10 @@ if args[1] == "install" then
 		loadPkg(args[2])
 	end
 elseif args[1] == "remove" then
-	print("NYI")
+	inst = fs.list("/bin/cc-get/packages")
+	if table.contains(inst, args[2]) then
+		fs.delete("/bin/cc-get/packages/" .. args[2])
+	end
 elseif args[1] == "upgrade" then
 	print("NYI")
 elseif args[1] == "installed" then
@@ -41,6 +44,8 @@ elseif args[1] == "installed" then
   		end
 	end
 elseif args[1] == "setpath" then
+	shell.setPath(shell.path() .. ":/bin/cc-get/")
+
 	FileList = fs.list("/bin/cc-get/packages")
 	for _, file in ipairs(FileList) do
 		if fs.isDir("/bin/cc-get/packages/" .. file) then
