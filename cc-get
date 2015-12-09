@@ -14,12 +14,10 @@ end
 function loadPkg(name)
 	pkgRoot = source .. name .. "/"
 	pkg = textutils.unserialize(http.get(pkgRoot .. "package.inf").readAll())
-	for i, value in pairs(pkg) do
-		if i > 3 then
-			f = fs.open("/bin/cc-get/packages/" .. name .. "/" .. value, "w")
-			f.write(http.get(pkgRoot .. value).readAll())
-			f.close()
-		end
+	for i, value in pairs(pkg[4]) do
+		f = fs.open("/bin/cc-get/packages/" .. name .. "/" .. value, "w")
+		f.write(http.get(pkgRoot .. value).readAll())
+		f.close()
 	end
 
 	v = fs.open("/bin/cc-get/packages/" .. name .. "/version", "w")

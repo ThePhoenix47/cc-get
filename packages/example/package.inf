@@ -2,7 +2,12 @@
   "Example Pkg",
   "An example package",
   "1",
-  "data/data.dat",
-  "lib/lib.lua",
-  "ex",
+  {
+    "data/data.dat",
+    "lib/lib.lua",
+    "ex",
+  },
+  {
+    ,
+  },
 }
