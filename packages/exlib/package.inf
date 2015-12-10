@@ -1,0 +1,9 @@
+{
+  "Example Lib",
+  "An example library",
+  "1",
+  {
+    "lib.lua",
+  },
+  nil,
+}
