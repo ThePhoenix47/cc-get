@@ -3,4 +3,7 @@
   "exlib",
   "lyqyd-framebuffer",
   "nsh",
+  "configurationlib",
+  "raidtools",
+  "wget",
 }

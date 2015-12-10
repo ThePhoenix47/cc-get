@@ -1,0 +1,29 @@
+local args = {...}
+local usage = "wget <url> [destination]"
+if not http then
+  error("HTTP must be enabled.", 0)
+end
+
+local function getFile(url)
+  local handle = http.get(url)
+  if handle and handle.getResponseCode() == 200 then
+    return handle.readAll()
+  else
+    error("Error downloading file!", 0)
+  end
+end
+if #args == 1 then
+  local content = getFile(tArgs[1])
+  local file = fs.open(tArgs[1], "w")
+  file.write(content)
+  file.flush()
+  file.close()
+elseif #args == 2 then
+  local content = getFile(tArgs[1])
+  local file = fs.open(tArgs[2], "w")
+  file.write(content)
+  file.flush()
+  file.close()
+else
+  print(usage)
+end

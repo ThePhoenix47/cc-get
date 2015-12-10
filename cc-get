@@ -30,6 +30,9 @@ function loadPkg(name)
 			loadPkg(dep)
 		end
 	end
+	--if not (pkg[4] == nil) then
+	--	shell.run("/bin/cc-get/packages/" .. name .. "/" .. pkg[4])
+	--end
 
 	local ver = fs.open("/bin/cc-get/packages/" .. name .. "/version", "w")
 	ver.write(pkg[1])
