@@ -6,4 +6,6 @@
   "configurationlib",
   "raidtools",
   "wget",
+  "lyqydnet",
+  "lyqydnetlib",
 }

@@ -1,0 +1,167 @@
+routeTable = {}
+daemonTable = {}
+socketTable = {}
+networkDaemonTimeout = nil
+modems = {}
+
+function netInit(_side)
+	--initialize network communications
+	if net.daemonTable.netd then
+		local open = false
+		if not _side then
+			for n,side in pairs(rs.getSides()) do
+				if peripheral.getType(side) == "modem" then
+					modems[side] = peripheral.call(side, "isWireless") and "wireless" or "wired"
+					rednet.open(side)
+					open = true
+				end
+			end
+		else
+			modems[_side] = peripheral.call(_side, "isWireless") and "wireless" or "wired"
+			rednet.open(_side)
+			open = true
+		end
+		--keep in mind that netd must be an exception since packets coming to it do not always have route numbers yet.
+		if open then coroutine.resume(net.daemonTable.netd, "lyqydnet_packet", packet.new("SI", 0, "announce")) return true end
+	end
+	return false
+end
+
+function daemonAdd(dName, dFunction, socket)
+	daemonTable[dName] = coroutine.create(dFunction)
+	if socket then socketTable[tonumber(socket)] = daemonTable[dName] end
+	coroutine.resume(daemonTable[dName], 0, "SI", "start")
+end
+
+function daemonRemove(dName)
+	if daemonTable[dName] then
+		for sNum, sInfo in pairs(socketTable) do
+			if sInfo == dName then
+				sNum = nil
+			end
+		end
+		daemonTable[dName] = nil
+		return true
+	else
+		return false
+	end
+end
+
+function routeFromName(name)
+	for rNum,rInfo in ipairs(routeTable) do
+		if rInfo and rInfo.name == tostring(name) then return rNum end
+	end
+	return false
+end
+
+function routeFromCID(compID)
+	for rNum,rInfo in ipairs(routeTable) do
+		if rInfo and rInfo.idNum == tonumber(compID) then return rNum end
+	end
+	return false
+end
+
+function nameFromRoute(route)
+	if routeTable[route] then
+		return routeTable[route].name
+	else
+		return false
+	end
+end
+
+function CIDFromRoute(route)
+	if routeTable[route] then
+		return routeTable[route].idNum
+	else
+		return false
+	end
+end
+
+function send(pack, ll)
+	local routeNum = net.routeFromCID(pack.destination)
+	if routeNum then
+		local route = net.routeTable[routeNum]
+		if route.cost > 0 then
+			if ll then pack.confirm = true end
+			net.raw_send(route.interface, route.gateway, pack)
+			return true
+		else
+			if route.type == "T" then
+				coroutine.resume(daemonTable.netd, "lyqydnet_packet", packet.new("SI", 0, {instruction = "turtlepacket", data = pack}))
+			end
+			net.raw_send(route.interface, route.idNum, pack)
+			return true
+		end
+	elseif pack.type == "RM" then
+		if term.current then
+			local id = math.random(1, 2147483547)
+			local messTable = {
+				nMessageID = id,
+				nRecipient = pack.destination,
+				message = pack.payload,
+				sProtocol = pack.protocol,
+			}
+			for side in pairs(net.modems) do
+				net.raw_send(side, pack.destination, messTable)
+				net.raw_send(side, 65533, messTable)
+			end
+		else
+			for side in pairs(net.modems) do
+				net.raw_send(side, pack.destination, pack.payload)
+			end
+		end
+		return true
+	end
+	return false, "could not send packet"
+end
+
+function raw_send(side, recipient, message)
+	peripheral.call(side, "transmit", recipient, os.computerID(), message)
+end
+
+function add_route(idNumber, compType, compName, gateway, cost, interface)
+	idNumber = tonumber(idNumber)
+	compType = tostring(compType)
+	compName = tostring(compName)
+	gateway = tonumber(gateway) or -1
+	cost = tonumber(cost) or 0
+	for rNum,rInfo in ipairs(routeTable) do
+		if rInfo then
+			if idNumber == rInfo.idNum then
+				if rInfo.type ~= compType then
+					rInfo.type = compType
+				end
+				if rInfo.cost > cost then
+					rInfo.gateway = gateway
+					rInfo.cost = cost
+					rInfo.interface = interface
+				end
+				return rNum
+			end
+		end
+	end
+	local route = {}
+	route.idNum = idNumber
+	route.type = compType
+	route.name = compName
+	route.gateway = gateway
+	route.cost = cost
+	route.interface = interface
+	table.insert(routeTable, route)
+	return #routeTable
+end
+
+function remove_route(route)
+	if route then
+		local file = io.open("/etc/hosts", "w" )
+		if file then
+			for rNum, rInfo in ipairs(routeTable) do
+				if rNum ~= route then
+					file:write(rInfo.idNum..":"..rInfo.gateway..","..rInfo.cost..";"..rInfo.type.." "..rInfo.name.."\n")
+				end
+			end
+			file:close()
+		end
+		routeTable[route] = false
+	end
+end

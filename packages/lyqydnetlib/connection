@@ -1,0 +1,175 @@
+connectionTable = {}
+
+local function getPort()
+	local validPort = false
+	local portChoice = 51
+	local portsInUse = {}
+	for k, v in pairs(connection.connectionTable) do
+		if v and v.localport then
+			portsInUse[v.localport] = true
+		end
+	end
+	while not validPort do
+		if portsInUse[portChoice] then
+			portChoice = portChoice + 1
+		else
+			validPort = true
+		end
+	end
+	return portChoice
+end
+
+local Connection = {
+	newPacket = function(self, pType, message)
+		return packet.new(pType, self.remote, message, self.remoteport, self.localport)
+	end,
+	open = function(self, timeout, _message)
+		if self.state ~= "open" then
+			message = _message or "connect"
+			self.localport = getPort()
+			net.send(self:newPacket("SQ", message))
+			self.state = "open_wait"
+			local response = self:listen(timeout)
+			if response and response.type == "SR" then
+				self.state = "open"
+				return response.payload
+			else
+				self.state = "closed"
+				return false
+			end
+		end
+	end,
+	send = function(self, pType, message)
+		if self.state == "open" then
+			local packetType = pType
+			if #pType > 2 then
+				if packet.types[pType] then packetType = packet.types[pType] else return false, "invalid packet type" end
+			end
+			local pack = self:newPacket(packetType, message)
+			return net.send(pack)
+		else return false, "connection not open" end
+	end,
+	listen = function(self, timeout)
+		if self.state == "open" or self.state == "open_wait" then
+			local revert
+			if net.socketTable[self.localport] and net.socketTable[self.localport] ~= coroutine.running() then
+				return nil, "Cannot listen on socket"
+			elseif net.socketTable[self.localport] and net.socketTable[self.localport] == coroutine.running() then
+				revert = false
+			else
+				revert = true
+				net.socketTable[self.localport] = coroutine.running()
+			end
+			local timer
+			if timeout then timer = os.startTimer(timeout) end
+			while true do
+				local event = {os.pullEvent()}
+				if event[1] == "lyqydnet_packet" then
+					--be really sure the packet is intended for us.
+					if event[2].toSock == self.localport and event[2].fromSock == self.remoteport and event[2].origin == self.remote and event[2].destination == os.computerID() then
+						if revert then net.socketTable[self.localport] = nil end
+						return event[2]
+					end
+				elseif event[1] == "timer" and timeout and event[2] == timer then
+					if revert then net.socketTable[self.localport] = nil end
+					return false
+				end
+			end
+		else return false end
+	end,
+	close = function(self, message, quiet)
+		if self.state == "open" then
+			if quiet ~= true then
+				local pack = self:newPacket("SC", message or "disconnect")
+				net.send(pack)
+			end
+			--must explicitly compare to true so that a string value will not evaluate as also true.
+			if net.socketTable[self.localport] == true then net.socketTable[self.localport] = nil end
+			self.state = "closed"
+			return true
+		else return false end
+	end,
+	isTurtle = function(self)
+		if net.routeTable[self:route()].type == "T" then return true else return false end
+	end,
+	name = function(self)
+		return net.nameFromRoute(self:route())
+	end,
+	route = function(self)
+		return net.routeFromCID(self.remote)
+	end,
+	destroy = function(self)
+		for cNum, cInfo in pairs(connection.connectionTable) do
+			if cInfo == self then
+				table.remove(connection.connectionTable, cNum)
+				break
+			end
+		end
+	end,
+}
+
+local cmetatable = {__index = Connection}
+
+function new(destination, port, localport)
+	local instance = {
+		--get a local port when opening the connection unless specified.
+		localport = localport,
+		remoteport = port,
+		state = "new",
+	}
+	local dType, dValue = string.match(destination, "^(%a):(.*)")
+	if dType == "i" then
+		instance.remote = tonumber(dValue)
+	elseif dType == "r" then
+		instance.remote = net.CIDFromRoute(dValue)
+	elseif destination then
+		instance.remote = net.CIDFromRoute(net.routeFromName(destination))
+	end
+	--if a local port is specified, assume that the connection is already open.
+	if localport then instance.state = "open" end
+	setmetatable(instance, cmetatable)
+	table.insert(connection.connectionTable, instance)
+	return instance
+end
+
+--searches for a connection matching inbound packet details.
+function find(pack)
+	for cNum, cInfo in ipairs(connection.connectionTable) do
+		if cInfo.remote == pack.origin and cInfo.remoteport == pack.fromSock and cInfo.localport == pack.toSock then
+			return cNum, cInfo
+		end
+	end
+	return false
+end
+
+function listen(port, timeout)
+	local revert
+	if net.socketTable[port] and net.socketTable[port] ~= coroutine.running() then
+		return nil, "Cannot listen on socket"
+	elseif net.socketTable[port] and net.socketTable[port] == coroutine.running() then
+		revert = false
+	else
+		revert = true
+		net.socketTable[port] = coroutine.running()
+	end
+	local timer
+	if timeout then timer = os.startTimer(timeout) end
+	while true do
+		local event = {os.pullEvent()}
+		if event[1] == "lyqydnet_packet" then
+			if event[2].toSock == port and event[2].destination == os.computerID() then
+				local found, conn = connection.find(event[2])
+				if found then
+					if revert then net.socketTable[port] = nil end
+					return event[2], conn
+				else
+					if revert then net.socketTable[port] = nil end
+					return event[2], connection.new("i:"..event[2].origin, event[2].fromSock, event[2].toSock)
+				end
+			end
+		elseif event[1] == "timer" and timeout and event[2] == timer then
+			if revert then net.socketTable[port] = nil end
+			return false
+		end
+	end
+end

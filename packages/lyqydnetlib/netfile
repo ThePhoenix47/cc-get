@@ -1,0 +1,58 @@
+function get (conn, remoteFile, localFile, timeout)
+	if not conn:send("fileQuery", remoteFile) then return false end
+	return receive(conn, localFile, timeout)
+end
+
+function send (conn, localFile)
+	--have already gotten an FR/FQ, need to just send the file now.
+	if fs.exists(localFile) then
+		if not conn:send("fileHeader", localFile) then return false end
+		local file = io.open( localFile, "r" )
+		local contents = file:read("*a")
+		if contents then
+			conn:send("fileData", contents)
+		end
+		file:close()
+	else
+		conn:send("fileHeader", "fileNotFound")
+		return false
+	end
+	conn:send("fileEnd", "end")
+	return true
+end
+
+function put (conn, localFile, remoteFile, timeout)
+	if not fs.exists(localFile) then return false end
+	if not conn:send("fileSend", remoteFile) then return false end
+	local response = conn:listen(timeout)
+	if packet.types[repsonse.type] ~= "fileResponse" or response.payload ~= "ok" then return false end
+	return send(conn, localFile)
+end
+
+function receive (conn, lFile, timeout)
+	--already got an FS and replied or sent an FQ, just catch the file header and data now.
+	if not connection.connectionTable[conn] then return false end
+	local header = nil
+	local fileData = nil
+	while true do
+		local response = conn:listen(timeout)
+		if response == false then
+			return false
+		elseif packet.types[response.type] == "fileEnd" then
+			if lFile then file = io.open( lFile, "w" ) end
+			if file then
+				if not fileData then fileData = "" end
+				file:write(fileData.."\n")
+				file:close()
+				return true, header
+			else
+				return fileData, header
+			end
+		elseif packet.types[response.type] == "fileHeader" then
+			header = response.payload
+			if header == "fileNotFound" then return true end
+		elseif packet.types[response.type] == "fileData" then
+			fileData = response.payload
+		end
+	end
+end
