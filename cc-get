@@ -84,7 +84,7 @@ elseif args[1] == "setpath" then
 
 	local PackageList = fs.list("/bin/cc-get/packages")
 	for _, package in ipairs(PackageList) do
-		if fs.isDir("/bin/cc-get/packages/" .. package) and not string.sub(package, -3) == "lib" then
+		if fs.isDir("/bin/cc-get/packages/" .. package) and not (string.sub(package, -3) == "lib") then
 			shell.setPath(shell.path() .. ":/bin/cc-get/packages/".. package)
   		end
 	end
