@@ -15,3 +15,6 @@ removed using `cc-get remove *program*`.
 `cc-get upgrade` installs all pending updates for any packages.
 
 `cc-get installed` lists all installed packages.
+
+##Installing
+Don't use this GitHub repository for installing, for you don't want to be a git. Use PasteBin instead: run the installer by typing `pastebin run PKieqe7w` in your computer, and just start using cc-get!
