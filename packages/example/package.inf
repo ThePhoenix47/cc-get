@@ -4,7 +4,6 @@
   "1",
   {
     "data/data.dat",
-    "lib/lib.lua",
     "ex",
   },
   {
