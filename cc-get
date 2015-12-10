@@ -17,10 +17,12 @@ function loadPkg(name)
 	if not (pkg[2] == "none") then
 		print("Loading package " .. name .. "...")
 		for _, file in pairs(pkg[2]) do
-			print("Getting: " .. file)
-			local f = fs.open("/bin/cc-get/packages/" .. name .. "/" .. file, "w")
-			f.write(http.get(pkgRoot .. file).readAll())
-			f.close()
+			if not fs.exists("/bin/cc-get/packages/" .. name .. "/" .. file) then
+				print("Getting: " .. file)
+				local f = fs.open("/bin/cc-get/packages/" .. name .. "/" .. file, "w")
+				f.write(http.get(pkgRoot .. file).readAll())
+				f.close()
+			end
 		end
 	end
 	if not (pkg[3] == "none") then
@@ -54,11 +56,18 @@ elseif args[1] == "upgrade" then
 	for _, package in ipairs(PackageList) do
 		if fs.isDir("/bin/cc-get/packages/" .. package) then
 			local ver = fs.open("/bin/cc-get/packages/" .. package .. "/version", "r")
-  			local installedVersion = r.readAll()
-  			local pkg = textutils.unserialize(http.get(source .. package .. "/package.inf"))
+  			local installedVersion = ver.readAll()
+  			ver.close()
+  			local pkg = textutils.unserialize(http.get(source .. package .. "/package.inf").readAll())
   			local newestVersion =  pkg[1]
   			if installedVersion < newestVersion then
-  				fs.delete("/bin/cc-get/packages/" .. package .. "/*")
+  				fileList = fs.list("/bin/cc-get/packages/" .. package)
+  				for _, file in pairs(fileList) do
+  					if not fs.isDir("/bin/cc-get/packages/" .. package .. "/" .. file) then
+  						fs.delete("/bin/cc-get/packages/" .. package .. "/" .. file)
+  					end
+  				end
+  				loadPkg(package)
   			end
   		end
 	end
